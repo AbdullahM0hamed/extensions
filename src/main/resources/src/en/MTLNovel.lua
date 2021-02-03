@@ -1,6 +1,7 @@
--- {"id":573,"ver":"1.0.1","libVer":"1.0.0","author":"Doomsdayrs","dep":["url>=1.0.0"]}
+-- {"id":573,"ver":"1.0.2","libVer":"1.0.0","author":"Doomsdayrs","dep":["url>=1.0.0"]}
 
 local baseURL = "https://www.mtlnovel.com"
+local ajaxURL = baseURL .. "/wp-admin/admin-ajax.php"
 local settings = { [1] = 0 }
 
 local ORDER_BYS_INT = { [0] = "date",[1] = "name",[2] = "rating",[3] = "view" }
@@ -14,6 +15,9 @@ local STATUSES_KEY = 104
 
 ---@type fun(table, string): string
 local qs = Require("url").querystring
+
+local POST = Require("dkjson").POST
+local decode = Require("dkjson").decode
 
 ---@param v Element | Elements
 local function text(v)
@@ -82,12 +86,30 @@ local function getPassage(chapterURL)
 	return table.concat(map(d:selectFirst("div.par"):select("p"), text), "\n")
 end
 
+---@return table @Novel array list
+local function search(filters)
+    data = POST(ajaxURL, nil, RequestBody(qs({ action = "autosuggest", q = filters[QUERY] }), MediaType("application/x-www-form-urlencoded")))
+
+    decoded = decode(data)
+    results_response = decoded.items[0].results
+
+    local results = {}
+    for index in results_response do
+        novel = Novel()
+        novel:setTitle(results_response[index].title)
+        novel:setLink(results_response[index].permalink)
+        novel:setImageURL(results_response[index].thumbnail)
+        results[index] = novel
+    end
+
+    return results
+end
+         
 return {
 	id = 573,
 	name = "MTLNovel",
 	baseURL = baseURL,
 	imageURL = "https://github.com/shosetsuorg/extensions/raw/dev/src/main/resources/icons/MTLNovel.png",
-	hasSearch = false,
 	listings = {
 		Listing("Novel List", true, function(data)
 			local d = GETDocument(baseURL .. "/novel-list/" ..
@@ -107,6 +129,7 @@ return {
 	},
 	getPassage = getPassage,
 	parseNovel = parseNovel,
+    search = search,
 	--settings = {
 		--  DropdownFilter(1, "Language", { "English", "Chinese" })
 	--},
